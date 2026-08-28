@@ -10,11 +10,10 @@ export interface RazorpayPaymentLinkResponse {
 }
 
 export function isRazorpayConfigured(): boolean {
-  return Boolean(
-    process.env.ENABLE_LIVE_RAZORPAY_API === 'true' &&
-    process.env.RAZORPAY_KEY_ID &&
-    process.env.RAZORPAY_KEY_SECRET
-  );
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  const isEnabled = process.env.ENABLE_LIVE_RAZORPAY_API !== 'false';
+  return Boolean(isEnabled && keyId && keySecret);
 }
 
 function getBasicAuthHeader(): string {
