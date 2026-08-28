@@ -164,7 +164,60 @@ export async function processCaseRecovery(caseId: string): Promise<{ caseData: R
     }
   }
 
-  // Deterministic Simulator Execution Mode
+  // Payment Link Intervention handling for Simulator Mode
+  if (intervention === 'SEND_SMART_PAYMENT_LINK') {
+    const simLinkId = `plink_sim_${Date.now().toString(36)}`;
+    const simUrl = `https://rzp.io/i/demo_smart_link_${c.id}`;
+
+    const updatedCase = updateCase(caseId, {
+      status: 'recovering',
+      attempts_count: nextAttemptCount,
+      risk_score: diagnosis.risk_score,
+      recommended_action: intervention,
+      diagnosis_summary: diagnosis.explanation,
+      razorpay_payment_link_id: simLinkId,
+      payment_link_url: simUrl,
+    })!;
+
+    addAuditLog({
+      case_id: caseId,
+      timestamp: new Date().toISOString(),
+      actor: 'AGENT',
+      step_name: 'EXECUTE_ACTION',
+      action_taken: `Generated & Sent Razorpay Smart Payment Link`,
+      reasoning: `Generated Smart Payment Link (${simUrl}) sent via SMS & Email to ${c.customer_phone}.`,
+      input_data: JSON.stringify({ intervention, channel: c.channel, recipient: c.customer_email }),
+      output_data: JSON.stringify({ payment_link_url: simUrl, status: 'recovering' }),
+      status: 'SUCCESS',
+    });
+
+    addAuditLog({
+      case_id: caseId,
+      timestamp: new Date().toISOString(),
+      actor: 'AGENT',
+      step_name: 'OUTCOME',
+      action_taken: 'Awaiting Customer Payment',
+      reasoning: `Payment Link ${simUrl} generated. Awaiting customer checkout or manual verification.`,
+      output_data: JSON.stringify({ current_status: 'recovering' }),
+      status: 'IN_PROGRESS',
+    });
+
+    return {
+      caseData: updatedCase,
+      actionResult: {
+        success: true,
+        action_type: intervention,
+        action_description: `Generated Razorpay Smart Payment Link (${simUrl})`,
+        outcome_message: `Smart Payment Link dispatched to ${c.customer_phone}. Click 'View Details' to view link.`,
+        recovered_amount: 0,
+        next_step: 'Customer must complete payment via generated link.',
+        stop_or_escalate: false,
+        new_status: 'recovering',
+      },
+    };
+  }
+
+  // Deterministic Simulator Execution Mode for direct retry interventions
   let success = true;
   let actionDesc = '';
   let outcomeMsg = '';
@@ -173,11 +226,6 @@ export async function processCaseRecovery(caseId: string): Promise<{ caseData: R
     case 'AUTO_RETRY':
       actionDesc = `Executed Gateway Direct Retry via ${c.bank_name || 'Primary Gateway'}`;
       outcomeMsg = `Gateway API re-queried. Downtime resolved and payment authorization succeeded.`;
-      break;
-
-    case 'SEND_SMART_PAYMENT_LINK':
-      actionDesc = `Generated & Sent Razorpay Smart Payment Link via SMS & Email to ${c.customer_phone}`;
-      outcomeMsg = `Customer opened smart link and completed checkout using UPI.`;
       break;
 
     case 'PROMPT_CARD_UPDATE':
