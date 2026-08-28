@@ -1,4 +1,6 @@
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import { RecoveryCase } from '../agent/types';
 
 export interface RazorpayPaymentLinkResponse {
@@ -9,7 +11,31 @@ export interface RazorpayPaymentLinkResponse {
   amount_paid: number;
 }
 
+function ensureEnvLoaded() {
+  if (!process.env.RAZORPAY_KEY_ID) {
+    try {
+      const envLocalPath = path.join(process.cwd(), '.env.local');
+      if (fs.existsSync(envLocalPath)) {
+        const envConfig = fs.readFileSync(envLocalPath, 'utf-8');
+        envConfig.split('\n').forEach(line => {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith('#')) {
+            const [key, ...valueParts] = trimmed.split('=');
+            const val = valueParts.join('=').replace(/^["']|["']$/g, '');
+            if (key && val) {
+              process.env[key.trim()] = val;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      // Ignore if file doesn't exist
+    }
+  }
+}
+
 export function isRazorpayConfigured(): boolean {
+  ensureEnvLoaded();
   const keyId = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
   const isEnabled = process.env.ENABLE_LIVE_RAZORPAY_API !== 'false';
@@ -17,6 +43,7 @@ export function isRazorpayConfigured(): boolean {
 }
 
 function getBasicAuthHeader(): string {
+  ensureEnvLoaded();
   const keyId = process.env.RAZORPAY_KEY_ID || '';
   const keySecret = process.env.RAZORPAY_KEY_SECRET || '';
   const credentials = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
@@ -24,6 +51,7 @@ function getBasicAuthHeader(): string {
 }
 
 export async function createRazorpayPaymentLink(c: RecoveryCase): Promise<RazorpayPaymentLinkResponse> {
+  ensureEnvLoaded();
   const amountInPaise = Math.round(c.amount * 100);
   const cleanPhone = c.customer_phone.replace(/\s+/g, '');
 
@@ -101,6 +129,7 @@ export function verifyRazorpayWebhookSignature(
 }
 
 export async function fetchRazorpayPaymentLinkStatus(plinkId: string): Promise<RazorpayPaymentLinkResponse | null> {
+  ensureEnvLoaded();
   if (!isRazorpayConfigured()) return null;
 
   try {
