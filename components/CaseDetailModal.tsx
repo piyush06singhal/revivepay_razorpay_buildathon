@@ -56,6 +56,9 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
       const data = await res.json();
       setVerifyMessage(data.message || 'Verification complete');
       await fetchLogs(recoveryCase.id);
+      
+      // Instantly refresh dashboard cases list and top metrics summary
+      await onRecover(recoveryCase.id);
     } catch (err: any) {
       setVerifyMessage(err.message || 'Verification failed');
     } finally {
