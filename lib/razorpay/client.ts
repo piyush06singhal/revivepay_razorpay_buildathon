@@ -54,12 +54,13 @@ export async function createRazorpayPaymentLink(c: RecoveryCase): Promise<Razorp
   ensureEnvLoaded();
   const amountInPaise = Math.round(c.amount * 100);
   const cleanPhone = c.customer_phone.replace(/\s+/g, '');
+  const uniqueReferenceId = `${c.id}_${Date.now()}`;
 
   const payload = {
     amount: amountInPaise,
     currency: c.currency || 'INR',
     accept_partial: false,
-    reference_id: c.id,
+    reference_id: uniqueReferenceId,
     description: `RevivePay Smart Recovery for ${c.issue_type.replace('_', ' ')} (${c.id})`,
     customer: {
       name: c.customer_name,
